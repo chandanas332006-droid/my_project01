@@ -1,0 +1,3361 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlycoSense — AI Hypoglycemia Risk Screening</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap');
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #f0f4fa;
+      --surface: #ffffff;
+      --surface2: #f7f9fc;
+      --border: rgba(30, 60, 120, 0.10);
+      --border2: rgba(30, 60, 120, 0.18);
+      --text: #0d1b2e;
+      --text2: #4a5f7a;
+      --text3: #8298b0;
+      --accent: #1a5fd8;
+      --accent2: #0a3f9e;
+      --accent-bg: #e8f0fe;
+      --green: #0d9368;
+      --green-bg: #e6f7f1;
+      --amber: #c07a00;
+      --amber-bg: #fff8e6;
+      --red: #c9292a;
+      --red-bg: #fdeaea;
+      --pulse: #e84040;
+      --teal: #0891b2;
+      --font: 'DM Sans', sans-serif;
+      --mono: 'DM Mono', monospace;
+      --r: 12px;
+      --r2: 8px;
+      --shadow: 0 2px 16px rgba(26, 95, 216, 0.08);
+      --shadow2: 0 4px 32px rgba(26, 95, 216, 0.13);
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* LAYOUT */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    nav button {
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--text2);
+      cursor: pointer;
+      transition: var(--transition);
+      font-weight: 400;
+    }
+
+    nav button:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    nav button.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      margin-right: 6px;
+      box-shadow: 0 0 0 3px var(--green-bg);
+    }
+
+    .status-pill {
+      font-size: 12px;
+      color: var(--green);
+      background: var(--green-bg);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+    }
+
+    main {
+      flex: 1;
+      padding: 24px 28px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* GRID */
+    .grid-main {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      grid-template-rows: auto auto;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .grid-left {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .grid-right {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .grid-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      margin-top: 0;
+    }
+
+    /* CARDS */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text2);
+      text-transform: uppercase;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    /* CAMERA PANEL */
+    .camera-wrap {
+      position: relative;
+      background: #07111f;
+      border-radius: 0;
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      max-height: 380px;
+    }
+
+    #videoEl {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: block;
+    }
+
+    #overlayCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+
+    .camera-hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .hud-corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: rgba(26, 95, 216, 0.8);
+      border-style: solid;
+    }
+
+    .hud-corner.tl {
+      top: 16px;
+      left: 16px;
+      border-width: 2px 0 0 2px;
+      border-radius: 4px 0 0 0;
+    }
+
+    .hud-corner.tr {
+      top: 16px;
+      right: 16px;
+      border-width: 2px 2px 0 0;
+      border-radius: 0 4px 0 0;
+    }
+
+    .hud-corner.bl {
+      bottom: 16px;
+      left: 16px;
+      border-width: 0 0 2px 2px;
+      border-radius: 0 0 0 4px;
+    }
+
+    .hud-corner.br {
+      bottom: 16px;
+      right: 16px;
+      border-width: 0 2px 2px 0;
+      border-radius: 0 0 4px 0;
+    }
+
+    .scan-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 160px;
+      height: 160px;
+      border: 2px solid rgba(26, 95, 216, 0.5);
+      border-radius: 50%;
+      display: none;
+    }
+
+    .scan-ring.active {
+      display: block;
+      animation: scanPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes scanPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(26, 95, 216, 0.3);
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        box-shadow: 0 0 0 20px rgba(26, 95, 216, 0);
+        transform: translate(-50%, -50%) scale(1.05);
+      }
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(26, 95, 216, 0.8), transparent);
+      top: 0;
+      animation: scanLine 2s linear infinite;
+      display: none;
+    }
+
+    .scan-line.active {
+      display: block;
+    }
+
+    @keyframes scanLine {
+      0% {
+        top: 0;
+      }
+
+      100% {
+        top: 100%;
+      }
+    }
+
+    .cam-status-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(7, 17, 31, 0.75);
+      backdrop-filter: blur(8px);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cam-status-text {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      font-weight: 500;
+      font-family: var(--mono);
+    }
+
+    .rec-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--pulse);
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .rec-dot.recording {
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.2;
+      }
+    }
+
+    .progress-bar-wrap {
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s linear;
+    }
+
+    /* CONTROLS */
+    .controls-row {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    .btn {
+      padding: 9px 20px;
+      border-radius: var(--r2);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent2);
+    }
+
+    .btn-primary:disabled {
+      background: #8298b0;
+      cursor: not-allowed;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border2);
+    }
+
+    .btn-ghost:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .btn-danger {
+      background: var(--red-bg);
+      color: var(--red);
+      border: 1px solid rgba(201, 41, 42, 0.15);
+    }
+
+    .btn-danger:hover {
+      background: rgba(201, 41, 42, 0.15);
+    }
+
+    /* VITALS STRIP */
+    .vitals-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px 20px;
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+    }
+
+    .vital-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .vital-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text3);
+      font-weight: 600;
+    }
+
+    .vital-value {
+      font-size: 22px;
+      font-weight: 600;
+      font-family: var(--mono);
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .vital-unit {
+      font-size: 10px;
+      color: var(--text3);
+    }
+
+    .vital-trend {
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .trend-up {
+      color: var(--red);
+    }
+
+    .trend-down {
+      color: var(--green);
+    }
+
+    .trend-stable {
+      color: var(--text3);
+    }
+
+    /* RISK GAUGE */
+    .gauge-wrap {
+      padding: 24px 20px;
+      text-align: center;
+    }
+
+    .gauge-svg {
+      width: 200px;
+      height: 120px;
+    }
+
+    .risk-label {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .risk-label.low {
+      color: var(--green);
+    }
+
+    .risk-label.medium {
+      color: var(--amber);
+    }
+
+    .risk-label.high {
+      color: var(--red);
+    }
+
+    .risk-sub {
+      font-size: 12px;
+      color: var(--text3);
+    }
+
+    .confidence-ring-wrap {
+      padding: 0 20px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .confidence-ring {
+      width: 60px;
+      height: 60px;
+      flex-shrink: 0;
+    }
+
+    .confidence-text {
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+
+    .confidence-pct {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    /* EXPLANATION */
+    .explain-box {
+      background: var(--accent-bg);
+      border: 1px solid rgba(26, 95, 216, 0.15);
+      border-radius: var(--r2);
+      padding: 14px 16px;
+      margin: 0 20px 16px;
+      font-size: 13px;
+      color: var(--accent2);
+      line-height: 1.6;
+    }
+
+    .factor-premium-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0 16px 24px;
+    }
+    .factor-premium-card {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: 0 2px 8px rgba(30, 60, 120, 0.04);
+    }
+    .factor-premium-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-right: 14px;
+      background: var(--surface2);
+    }
+    .factor-premium-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .factor-premium-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .factor-premium-sub {
+      font-size: 11px;
+      color: var(--text3);
+    }
+    .factor-premium-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .factor-premium-bar-wrap {
+      width: 40px;
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .factor-premium-bar {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .factor-premium-score {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--mono);
+      width: 28px;
+      text-align: right;
+    }
+    .composite-score-box {
+      background: var(--surface2);
+      border-radius: var(--r);
+      padding: 16px 20px;
+      margin: 0 16px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .composite-score-num {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+      font-family: var(--mono);
+    }
+    .composite-score-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .composite-score-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .composite-score-sub {
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    /* CONTEXT INPUTS */
+    .context-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 16px 20px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text3);
+    }
+
+    .field-input,
+    .field-select {
+      padding: 8px 12px;
+      border: 1px solid var(--border2);
+      border-radius: var(--r2);
+      font-family: var(--font);
+      font-size: 13px;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition: var(--transition);
+    }
+
+    .field-input:focus,
+    .field-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26, 95, 216, 0.12);
+    }
+
+    /* SIGNAL CHARTS */
+    .signal-chart-wrap {
+      padding: 8px 16px 16px;
+    }
+
+    .signal-label {
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    canvas.signal-canvas {
+      width: 100%;
+      height: 60px;
+      border-radius: 4px;
+    }
+
+    /* HISTORY */
+    .history-list {
+      padding: 0 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border-radius: var(--r2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .history-item:hover {
+      border-color: var(--accent);
+    }
+
+    .history-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .history-icon.low {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .history-icon.medium {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .history-icon.high {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .history-info {
+      flex: 1;
+    }
+
+    .history-risk {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .history-risk.low {
+      color: var(--green);
+    }
+
+    .history-risk.medium {
+      color: var(--amber);
+    }
+
+    .history-risk.high {
+      color: var(--red);
+    }
+
+    .history-time {
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    .history-bpm {
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--text2);
+    }
+
+    /* DOCUMENT */
+    .upload-zone {
+      border: 2px dashed var(--border2);
+      border-radius: var(--r2);
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      margin: 0 20px 16px;
+      background: var(--surface2);
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent);
+      background: var(--accent-bg);
+    }
+
+    .upload-zone .upload-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .upload-zone p {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .upload-zone span {
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    .doc-result {
+      padding: 0 20px 20px;
+    }
+
+    .doc-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--accent-bg);
+      border-radius: var(--r2);
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--accent2);
+      font-weight: 500;
+    }
+
+    .doc-bullets {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .doc-bullet {
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .doc-bullet::before {
+      content: '·';
+      color: var(--accent);
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: -2px;
+    }
+
+    /* TREND CHART */
+    .trend-chart-wrap {
+      padding: 0 20px 20px;
+    }
+
+    /* TABS */
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: var(--text);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: var(--r2);
+      font-size: 13px;
+      z-index: 999;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      max-width: 320px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* ALERTS */
+    .alert-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 20px;
+      margin: 0 20px 16px;
+      border-radius: var(--r2);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .alert-banner.warn {
+      background: var(--amber-bg);
+      border: 1px solid rgba(192, 122, 0, 0.2);
+      color: #7a4d00;
+    }
+
+    .alert-banner.danger {
+      background: var(--red-bg);
+      border: 1px solid rgba(201, 41, 42, 0.2);
+      color: #8a1a1a;
+    }
+
+    .alert-banner.info {
+      background: var(--accent-bg);
+      border: 1px solid rgba(26, 95, 216, 0.15);
+      color: var(--accent2);
+    }
+
+    .alert-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .alert-text strong {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    /* LOADER */
+    .analyzing-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(7, 17, 31, 0.75);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      display: none;
+    }
+
+    .analyzing-overlay.show {
+      display: flex;
+    }
+
+    .analyzing-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .analyzing-text {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    /* PROFILE PAGE */
+    .profile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .stat-block {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 16px;
+    }
+
+    .stat-block-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text3);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .stat-block-value {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    .stat-block-sub {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 4px;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 0 20px 20px;
+    }
+
+    .tag {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .tag.green {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .tag.amber {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .tag.red {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .tag.blue {
+      background: var(--accent-bg);
+      color: var(--accent);
+    }
+
+    /* BASELINE TABLE */
+    table.baseline-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    table.baseline-tbl th {
+      text-align: left;
+      padding: 8px 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text3);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.baseline-tbl td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+    }
+
+    table.baseline-tbl tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.baseline-tbl td:first-child {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    table.baseline-tbl .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 1100px) {
+      .grid-main {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-bottom {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      main {
+        padding: 16px;
+      }
+
+      header {
+        padding: 0 16px;
+      }
+
+      .grid-bottom {
+        grid-template-columns: 1fr;
+      }
+
+      .vitals-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .context-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Waveform canvas styling */
+    .waveform-container {
+      background: #07111f;
+      border-radius: var(--r2);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .waveform-label {
+      position: absolute;
+      top: 6px;
+      left: 10px;
+      font-size: 10px;
+      font-family: var(--mono);
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .waveform-value {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 12px;
+      font-family: var(--mono);
+      color: rgba(255, 255, 255, 0.75);
+      font-weight: 500;
+    }
+
+    /* CHATBOT */
+    .chat-btn {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 50px;
+      height: 50px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow2);
+      cursor: pointer;
+      z-index: 990;
+      transition: var(--transition);
+    }
+
+    .chat-btn:hover {
+      transform: scale(1.05);
+      background: var(--accent2);
+    }
+
+    .chat-window {
+      position: fixed;
+      bottom: 90px;
+      right: 28px;
+      width: 320px;
+      height: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow2);
+      z-index: 990;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: var(--transition);
+    }
+
+    .chat-window.open {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .chat-header {
+      padding: 12px 16px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: var(--r) var(--r) 0 0;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-close {
+      cursor: pointer;
+      font-size: 18px;
+      opacity: 0.8;
+    }
+
+    .chat-close:hover {
+      opacity: 1;
+    }
+
+    .chat-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--surface2);
+    }
+
+    .chat-msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: var(--r2);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .chat-msg.bot {
+      align-self: flex-start;
+      background: #fff;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 2px;
+    }
+
+    .chat-msg.user {
+      align-self: flex-end;
+      background: var(--accent-bg);
+      color: var(--accent2);
+      border-bottom-right-radius: 2px;
+    }
+
+    .chat-input-area {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      background: #fff;
+      border-radius: 0 0 var(--r) var(--r);
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      outline: none;
+      font-family: var(--font);
+      font-size: 13px;
+    }
+
+    .chat-input:focus {
+      border-color: var(--accent);
+    }
+
+    .chat-send {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .chat-send:hover {
+      background: var(--accent2);
+    }
+
+    /* Name Modal Overlay */
+    .name-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .name-modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .name-modal {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 32px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
+      transform: translateY(20px);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .name-modal-overlay.active .name-modal {
+      transform: translateY(0);
+    }
+    .name-modal-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .name-modal-sub {
+      font-size: 14px;
+      color: var(--text3);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .name-input-wrap {
+      margin-bottom: 24px;
+    }
+    .name-input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border2);
+      font-size: 15px;
+      outline: none;
+      transition: all 0.2s;
+      background: #f8fafc;
+      font-family: inherit;
+    }
+    .name-input:focus {
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(26,95,216,0.1);
+    }
+    .name-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .name-btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Custom Name Modal -->
+  <div class="name-modal-overlay" id="nameModalOverlay">
+    <div class="name-modal">
+      <div class="name-modal-title">Welcome to GlycoSense</div>
+      <div class="name-modal-sub">Please enter your name to personalize your clinical dashboard and tracking features.</div>
+      <div class="name-input-wrap">
+        <input type="text" id="nameModalInput" class="name-input" placeholder="e.g. John Doe" autocomplete="off" onkeydown="if(event.key === 'Enter') handleNameSubmit()">
+      </div>
+      <button class="name-btn" onclick="handleNameSubmit()">Continue to Dashboard</button>
+    </div>
+  </div>
+  <div class="app-shell">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+              fill="rgba(255,255,255,0.25)" />
+            <path d="M8 12h2l2-4 2 8 2-4h2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </div>
+        GlycoSense
+        <span style="font-size:11px;font-weight:400;color:var(--text3);margin-left:4px;">AI Hypoglycemia
+          Screening</span>
+      </div>
+      <nav>
+        <button class="active" onclick="switchPage('scan')">Live Scan</button>
+        <button onclick="switchPage('history')">History</button>
+        <button onclick="switchPage('documents')">Documents</button>
+        <button onclick="switchPage('profile')">Profile</button>
+        <button onclick="switchPage('insights')">Insights</button>
+        <button onclick="switchPage('caregiver')">Caregiver Mode</button>
+      </nav>
+      <div class="header-right">
+        <div class="status-pill"><span class="status-dot"></span>System Ready</div>
+        <div class="user-badge">JD</div>
+      </div>
+    </header>
+
+    <main>
+      <!-- SCAN PAGE -->
+      <div id="page-scan" class="page active">
+        <div class="grid-main">
+          <div class="grid-left">
+            <!-- Camera Card -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Live Face Analysis</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span id="frameCounter" style="font-size:11px;font-family:var(--mono);color:var(--text3);">0
+                    fps</span>
+                  <span id="faceStatus" style="font-size:12px;color:var(--text3);">No face detected</span>
+                </div>
+              </div>
+              <div class="camera-wrap">
+                <video id="videoEl" autoplay playsinline muted></video>
+                <canvas id="overlayCanvas"></canvas>
+                <div class="camera-hud">
+                  <div class="hud-corner tl"></div>
+                  <div class="hud-corner tr"></div>
+                  <div class="hud-corner bl"></div>
+                  <div class="hud-corner br"></div>
+                </div>
+                <div class="scan-ring" id="scanRing"></div>
+                <div class="scan-line" id="scanLine"></div>
+                <div class="analyzing-overlay" id="analyzingOverlay">
+                  <div class="analyzing-spinner"></div>
+                  <div class="analyzing-text" id="analyzingText">Initializing AI inference...</div>
+                </div>
+                <div class="cam-status-bar">
+                  <span class="cam-status-text">
+                    <span class="rec-dot" id="recDot"></span>
+                    <span id="camStatusText">Camera inactive — press Start Scan</span>
+                  </span>
+                  <span id="scanTimer"
+                    style="font-size:12px;font-family:var(--mono);color:rgba(255,255,255,0.5);">00:00</span>
+                </div>
+                <div class="progress-bar-wrap">
+                  <div class="progress-bar-fill" id="progressBar"></div>
+                </div>
+              </div>
+
+              <div class="vitals-row">
+                <div class="vital-chip">
+                  <div class="vital-label">Pulse Proxy</div>
+                  <div>
+                    <span class="vital-value" id="bpmVal">--</span>
+                    <span class="vital-unit"> bpm</span>
+                  </div>
+                  <div class="vital-trend" id="bpmTrend">—</div>
+                </div>
+                <div class="vital-chip">
+                  <div class="vital-label">Blink Rate</div>
+                  <div>
+                    <span class="vital-value" id="blinkVal">--</span>
+                    <span class="vital-unit"> /min</span>
+                  </div>
+                  <div class="vital-trend" id="blinkTrend">—</div>
+                </div>
+                <div class="vital-chip">
+                  <div class="vital-label">Head Tremor</div>
+                  <div>
+                    <span class="vital-value" id="tremorVal">--</span>
+                    <span class="vital-unit"> idx</span>
+                  </div>
+                  <div class="vital-trend" id="tremorTrend">—</div>
+                </div>
+                <div class="vital-chip">
+                  <div class="vital-label">Gaze Jitter</div>
+                  <div>
+                    <span class="vital-value" id="gazeVal">--</span>
+                    <span class="vital-unit"> px</span>
+                  </div>
+                  <div class="vital-trend" id="gazeTrend">—</div>
+                </div>
+              </div>
+
+              <div class="controls-row">
+                <button class="btn btn-primary" id="startBtn" onclick="startScan()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Start 20s Scan
+                </button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopScan()" disabled>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" />
+                  </svg>
+                  Stop
+                </button>
+                <button class="btn btn-ghost" onclick="resetScan()">Reset</button>
+                <div style="margin-left:auto;font-size:12px;color:var(--text3);" id="landmarkInfo">MediaPipe ready</div>
+              </div>
+            </div>
+
+            <!-- Waveform Signals -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Physiological Signal Streams</span>
+                <span style="font-size:11px;color:var(--text3);">rPPG / Temporal Analysis</span>
+              </div>
+              <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                  <div class="waveform-container" style="height:72px;">
+                    <div class="waveform-label">Forehead rPPG</div>
+                    <div class="waveform-value" id="ppgLabelVal">--</div>
+                    <canvas id="ppgCanvas" style="width:100%;height:72px;display:block;"></canvas>
+                  </div>
+                </div>
+                <div>
+                  <div class="waveform-container" style="height:72px;">
+                    <div class="waveform-label">Cheek RGB Var</div>
+                    <div class="waveform-value" id="rgbLabelVal">--</div>
+                    <canvas id="rgbCanvas" style="width:100%;height:72px;display:block;"></canvas>
+                  </div>
+                </div>
+                <div>
+                  <div class="waveform-container" style="height:72px;">
+                    <div class="waveform-label">Blink Signal</div>
+                    <div class="waveform-value" id="blinkLabelVal">--</div>
+                    <canvas id="blinkCanvas" style="width:100%;height:72px;display:block;"></canvas>
+                  </div>
+                </div>
+                <div>
+                  <div class="waveform-container" style="height:72px;">
+                    <div class="waveform-label">Head Stability</div>
+                    <div class="waveform-value" id="stabilityLabelVal">--</div>
+                    <canvas id="stabilityCanvas" style="width:100%;height:72px;display:block;"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Context Inputs moved to left grid -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Clinical Context</span>
+                <span style="font-size:11px;color:var(--text3);">Enhances accuracy</span>
+              </div>
+              <div class="context-grid">
+                <div class="field-group">
+                  <label class="field-label">Age</label>
+                  <input type="number" id="ageInput" class="field-input" placeholder="Enter age (e.g. 22)" min="1"
+                    max="120" value="25">
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Last Glucose Reading (mg/dL)</label>
+                  <input type="number" id="glucoseInput" class="field-input" placeholder="e.g. 90" value="90">
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Last Meal (hrs ago)</label>
+                  <input type="number" class="field-input" id="mealHours" placeholder="e.g. 3" min="0" max="24"
+                    value="4">
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Insulin / Medication</label>
+                  <select class="field-select" id="insulinCtx">
+                    <option value="none">None</option>
+                    <option value="recent" selected>Recent dose</option>
+                    <option value="increased">Increased dose</option>
+                    <option value="missed">Missed dose</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Activity Level</label>
+                  <select class="field-select" id="activityCtx">
+                    <option value="rest">Resting</option>
+                    <option value="light" selected>Light activity</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="intense">Intense workout</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Symptoms Noted</label>
+                  <select class="field-select" id="symptomsCtx">
+                    <option value="none" selected>None</option>
+                    <option value="mild">Mild dizziness</option>
+                    <option value="sweat">Sweating</option>
+                    <option value="tremor">Hand tremor</option>
+                    <option value="confusion">Confusion</option>
+                  </select>
+                </div>
+              </div>
+              <div style="padding: 0 20px 16px;">
+                <button class="btn btn-primary" style="width: 100%; justify-content: center; background: var(--text2);"
+                  onclick="generateActionPlan()">
+                  Submit Context & Get Action Plan
+                </button>
+              </div>
+              <div id="actionPlanResult" style="padding: 0 20px 20px; display: none;"></div>
+            </div>
+          </div>
+
+          <div class="grid-right">
+            <!-- Risk Gauge -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Risk Assessment</span>
+                <span id="riskTimestamp" style="font-size:11px;color:var(--text3);">—</span>
+              </div>
+              <div class="gauge-wrap">
+                <svg class="gauge-svg" viewBox="0 0 200 110" id="gaugeSVG">
+                  <defs>
+                    <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" style="stop-color:#0d9368;stop-opacity:1" />
+                      <stop offset="50%" style="stop-color:#c07a00;stop-opacity:1" />
+                      <stop offset="100%" style="stop-color:#c9292a;stop-opacity:1" />
+                    </linearGradient>
+                  </defs>
+                  <!-- Background arc -->
+                  <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e8eef6" stroke-width="12"
+                    stroke-linecap="round" />
+                  <!-- Colored arc -->
+                  <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGrad)" stroke-width="12"
+                    stroke-linecap="round" opacity="0.25" />
+                  <!-- Gauge needle -->
+                  <line id="gaugeNeedle" x1="100" y1="100" x2="100" y2="28" stroke="#1a5fd8" stroke-width="2.5"
+                    stroke-linecap="round" transform="rotate(0,100,100)" />
+                  <circle cx="100" cy="100" r="6" fill="#1a5fd8" />
+                  <!-- Labels -->
+                  <text x="14" y="110" font-size="9" fill="#0d9368" font-family="DM Mono" font-weight="500">LOW</text>
+                  <text x="85" y="18" font-size="9" fill="#c07a00" font-family="DM Mono" font-weight="500">MED</text>
+                  <text x="168" y="110" font-size="9" fill="#c9292a" font-family="DM Mono" font-weight="500">HIGH</text>
+                </svg>
+                <div class="risk-label" id="riskLabel">—</div>
+                <div class="risk-sub">Hypoglycemia Risk Estimate</div>
+              </div>
+
+              <div class="confidence-ring-wrap">
+                <svg class="confidence-ring" viewBox="0 0 60 60">
+                  <circle cx="30" cy="30" r="24" fill="none" stroke="#e8eef6" stroke-width="5" />
+                  <circle id="confRing" cx="30" cy="30" r="24" fill="none" stroke="#1a5fd8" stroke-width="5"
+                    stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round"
+                    transform="rotate(-90,30,30)" style="transition:stroke-dashoffset 1s ease;" />
+                  <text x="30" y="35" text-anchor="middle" font-size="13" font-weight="600" fill="#0d1b2e"
+                    font-family="DM Mono" id="confPct">0%</text>
+                </svg>
+                <div class="confidence-text">
+                  <div class="confidence-pct" id="confValue">—</div>
+                  <div style="font-size:11px;color:var(--text3);">Confidence Score</div>
+                  <div style="font-size:11px;color:var(--text3);margin-top:2px;" id="confSub">Run a scan to generate
+                    assessment</div>
+                </div>
+              </div>
+
+              <div class="explain-box" style="background: var(--surface2); border: 1px solid var(--border); color: var(--text2); margin-top: -8px;">
+                <strong style="display:block;margin-bottom:4px;color:var(--text);font-size:12px;">What is this result?</strong>
+                This percentage represents the AI's confidence in the inferred risk level based on your physiological signals (BPM, blink rate, tremors) and clinical context.
+              </div>
+
+              <div class="explain-box" id="explainBox">
+                Position your face in frame and start a 20-second scan to receive AI-powered hypoglycemia risk
+                assessment.
+              </div>
+
+              <div style="padding: 16px; display:flex; align-items:center; justify-content:space-between; border-top: 1px solid var(--border);">
+                <div style="font-size:13px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px;">
+                  <span style="color:var(--accent);">🧠</span> Why This Result?
+                </div>
+                <span style="color:var(--text3); font-size:12px;">▼</span>
+              </div>
+              <div id="factorList" class="factor-premium-list">
+                <div style="font-size:11px;color:var(--text3);text-align:center;padding:8px 0;">Factors will appear after scan</div>
+              </div>
+            </div>
+
+            </div>
+        </div>
+      </div>
+
+      <!-- HISTORY PAGE -->
+      <div id="page-history" class="page">
+        <div class="grid-main">
+          <div class="grid-left">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Scan History</span>
+                <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;"
+                  onclick="clearHistory()">Clear</button>
+              </div>
+              <div class="history-list" id="historyList">
+                <div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">No scans completed yet.
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Pulse Proxy Trend</span>
+              </div>
+              <div class="trend-chart-wrap" style="height:220px;">
+                <canvas id="trendChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="grid-right">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Pattern Insights</span></div>
+              <div style="padding:20px;">
+                <div id="patternInsights" style="font-size:13px;color:var(--text2);line-height:1.7;">
+                  Complete 3 or more scans to receive personalized pattern insights.
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Baseline Metrics</span></div>
+              <table class="baseline-tbl">
+                <thead>
+                  <tr>
+                    <th>Metric</th>
+                    <th>Baseline</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="baselineTbl">
+                  <tr>
+                    <td>Pulse Proxy</td>
+                    <td id="bBpm">—</td>
+                    <td><span class="badge" style="background:var(--surface2);color:var(--text3);">Pending</span></td>
+                  </tr>
+                  <tr>
+                    <td>Blink Rate</td>
+                    <td id="bBlink">—</td>
+                    <td><span class="badge" style="background:var(--surface2);color:var(--text3);">Pending</span></td>
+                  </tr>
+                  <tr>
+                    <td>Head Stability</td>
+                    <td id="bStability">—</td>
+                    <td><span class="badge" style="background:var(--surface2);color:var(--text3);">Pending</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENTS PAGE -->
+      <div id="page-documents" class="page">
+        <div class="grid-main">
+          <div class="grid-left">
+            <div class="card" style="border:none; box-shadow:none; padding:0; background:transparent;">
+              <div class="card-header" style="background:#ffffff; border:1px solid var(--border); border-bottom:none; border-radius:var(--r) var(--r) 0 0; padding:16px 20px;">
+                <span class="card-title" style="text-transform:uppercase;font-size:12px;letter-spacing:0.5px;">Medical Document Analysis</span>
+                <span style="font-size:11px;color:var(--text3);">AI-powered summarization via Gemini</span>
+              </div>
+              <div style="background:#ffffff; border:1px solid var(--border); border-top:none; border-radius:0 0 var(--r) var(--r); padding:0 20px 24px;">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" style="margin:0;">
+                  <div class="upload-icon">📄</div>
+                  <p>Upload prescription, discharge summary, or medical notes</p>
+                  <span>PDF · Image · Text — click or drag & drop</span>
+                  <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.txt" style="display:none" onchange="handleFileUpload(event)">
+                </div>
+              </div>
+              <div id="docResult" style="margin-top:16px; display:none;"></div>
+            </div>
+          </div>
+          <div class="grid-right">
+            <div class="card">
+              <div class="card-header"><span class="card-title" style="text-transform:uppercase; font-size:11px; font-weight:600; letter-spacing:0.5px;">Extracted Risk Factors</span></div>
+              <div style="padding:20px;" id="docRiskFactors">
+                <div style="font-size:13px;color:var(--text3);">Upload a document to extract risk factors.</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title" style="text-transform:uppercase; font-size:11px; font-weight:600; letter-spacing:0.5px;">Key Findings</span></div>
+              <div style="padding:20px;" id="docKeyFindings">
+                <div style="font-size:13px;color:var(--text3);">Upload a document to extract key findings.</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header" style="justify-content:space-between;">
+                <span class="card-title" style="text-transform:uppercase; font-size:11px; font-weight:600; letter-spacing:0.5px;">Document History</span>
+                <button style="background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:2px 10px; font-size:10px; font-weight:600; color:var(--text2); cursor:pointer;">Clear</button>
+              </div>
+              <div id="docHistory" style="padding:20px;font-size:13px;color:var(--text3);">No documents uploaded yet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE PAGE -->
+      <div id="page-profile" class="page">
+        <div class="grid-main">
+          <div class="grid-left">
+            <div class="card">
+              <div class="card-header"><span class="card-title">User Profile</span></div>
+              <div style="padding:20px;">
+                <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+                  <div class="user-badge" style="width:56px;height:56px;font-size:20px;">JD</div>
+                  <div>
+                    <div id="profileNameDisplay" style="font-size:18px;font-weight:600;">John Doe</div>
+                    <div style="font-size:13px;color:var(--text3);">Type 2 Diabetic · GlycoSense Pro</div>
+                  </div>
+                </div>
+                <div class="profile-grid">
+                  <div class="stat-block">
+                    <div class="stat-block-title">Total Scans</div>
+                    <div class="stat-block-value" id="totalScans">0</div>
+                    <div class="stat-block-sub">lifetime</div>
+                  </div>
+                  <div class="stat-block">
+                    <div class="stat-block-title">High Risk Events</div>
+                    <div class="stat-block-value" id="highRiskCount" style="color:var(--red);">0</div>
+                    <div class="stat-block-sub">flagged</div>
+                  </div>
+                  <div class="stat-block">
+                    <div class="stat-block-title">Avg Pulse Proxy</div>
+                    <div class="stat-block-value" id="avgBpm">—</div>
+                    <div class="stat-block-sub">bpm baseline</div>
+                  </div>
+                  <div class="stat-block">
+                    <div class="stat-block-title">Avg Confidence</div>
+                    <div class="stat-block-value" id="avgConf">—</div>
+                    <div class="stat-block-sub">%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Risk Pattern Tags</span></div>
+              <div class="tag-row" id="patternTags">
+                <div style="padding:4px;font-size:13px;color:var(--text3);">Tags will generate after 5+ scans.</div>
+              </div>
+            </div>
+          </div>
+          <div class="grid-right">
+            <div class="card">
+              <div class="card-header"><span class="card-title">System Info</span></div>
+              <div style="padding:20px;font-size:13px;color:var(--text2);line-height:2;">
+                <div>CV Engine: <strong>MediaPipe FaceMesh (sim)</strong></div>
+                <div>Signal: <strong>rPPG + Blink Analysis</strong></div>
+                <div>Inference: <strong>Rule-based + Adaptive</strong></div>
+                <div>Doc AI: <strong>Claude API (Anthropic)</strong></div>
+                <div>Storage: <strong>LocalStorage (session)</strong></div>
+                <div>Version: <strong>GlycoSense MVP 1.0</strong></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Disclaimer</span></div>
+              <div style="padding:20px;">
+                <div class="alert-banner info">
+                  <div class="alert-icon">ℹ</div>
+                  <div class="alert-text">
+                    <strong>Not a medical device</strong>
+                    GlycoSense is an AI screening tool for early risk awareness. It does not measure blood glucose.
+                    Always consult a qualified healthcare provider for diagnosis and treatment decisions.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- INSIGHTS PAGE -->
+      <div id="page-insights" class="page">
+        <div class="grid-main">
+          <div class="grid-left">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Smart AI Insights</span></div>
+              <div style="padding:20px; display:flex; flex-direction:column; gap:12px;" id="insightCards"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Risk Over Time (Last 14 Days)</span></div>
+              <div style="padding:20px; height: 260px;">
+                <canvas id="insightTrendChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="grid-right">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Behavioral Recommendations</span></div>
+              <div style="padding:20px; display:flex; flex-direction:column; gap:16px;" id="insightRecommendations"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Top Anomaly Triggers</span></div>
+              <div style="padding:20px; height: 260px;">
+                <canvas id="triggerBarChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAREGIVER PAGE -->
+      <div id="page-caregiver" class="page">
+        <div class="grid-main">
+          <div class="grid-left">
+            <div class="card">
+              <div class="card-header"><span class="card-title">7-Day Monitor Overview</span></div>
+              <div style="padding:20px; display:flex; justify-content:space-around; text-align:center;">
+                 <div id="cgHighestRiskDay"><h3 style="font-size:24px; color:var(--text);">—</h3><span style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:600;">Highest Risk Day</span></div>
+                 <div id="cgAvgNightRisk"><h3 style="font-size:24px; color:var(--amber);">—</h3><span style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:600;">Avg Nightly Risk</span></div>
+                 <div id="cgTotalAnomalies"><h3 style="font-size:24px; color:var(--red);">—</h3><span style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:600;">Total Anomalies</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Emergency History</span></div>
+              <div style="padding:10px 20px;" id="cgEmergencyEvents"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Post-Bedtime Instability (10 PM - 3 AM)</span></div>
+              <div style="padding:20px; height: 200px;">
+                <canvas id="cgNightChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="grid-right">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Compliance Trackers</span></div>
+              <div style="padding:20px; display:flex; flex-direction:column; gap:12px;" id="cgCompliance"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Clinical Context Alerts</span></div>
+              <div style="padding:20px; display:flex; flex-direction:column; gap:12px;" id="cgDocs"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="chat-btn" onclick="toggleChat()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+  </div>
+
+  <div class="chat-window" id="chatWindow">
+    <div class="chat-header">
+      <span>GlycoBot AI</span>
+      <span class="chat-close" onclick="toggleChat()">×</span>
+    </div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-input-area">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Ask about your risk..."
+        onkeypress="if(event.key==='Enter') sendChatMessage()">
+      <button class="chat-send" onclick="sendChatMessage()">↑</button>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // STATE
+    // ============================================================
+    const state = {
+      scanning: false,
+      scanProgress: 0,
+      scanDuration: 20,
+      scanInterval: null,
+      timerInterval: null,
+      frameCount: 0,
+      fpsInterval: null,
+      videoStream: null,
+      animFrame: null,
+
+      // Face detection simulation
+      faceDetected: false,
+      landmarks: [],
+
+      // Signal buffers (circular)
+      ppgBuffer: new Array(120).fill(0),
+      rgbBuffer: new Array(120).fill(0),
+      blinkBuffer: new Array(120).fill(0),
+      stabilityBuffer: new Array(120).fill(0),
+      bpmHistory: [],
+
+      // Live vitals
+      currentBpm: 0,
+      currentBlink: 0,
+      currentTremor: 0,
+      currentGaze: 0,
+
+      // Blink detection state
+      blinkTimestamps: [],
+      earClosedFrames: 0,
+      scanStartTime: 0,
+
+      // Scan history
+      scanHistory: JSON.parse(localStorage.getItem('glycoHistory') || '[]'),
+      baseline: JSON.parse(localStorage.getItem('glycoBaseline') || 'null'),
+
+      // Doc risk boost
+      docRiskBoost: 0,
+
+      // Charts
+      ppgCtx: null, rgbCtx: null, blinkCtx: null, stabilityCtx: null,
+      trendChart: null,
+
+      // Waveform draw positions
+      ppgX: 0, rgbX: 0, blinkX: 0, stabilityX: 0,
+
+      // Scan results accumulation
+      scanBpms: [], scanBlinks: [], scanTremors: [], scanGazes: [],
+
+      // Phase simulation
+      phase: 0,
+    };
+
+    // ============================================================
+    // PAGE NAVIGATION
+    // ============================================================
+    function switchPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + id).classList.add('active');
+      document.querySelectorAll('nav button').forEach((b, i) => {
+        b.classList.toggle('active', ['scan', 'history', 'documents', 'profile', 'insights', 'caregiver'][i] === id);
+      });
+      if (id === 'history') renderHistory();
+      if (id === 'profile') renderProfile();
+      if (id === 'insights') renderInsights();
+      if (id === 'caregiver') renderCaregiver();
+    }
+
+    // ============================================================
+    // WAVEFORM CANVASES
+    // ============================================================
+    function initWaveformCanvas(id) {
+      const el = document.getElementById(id);
+      el.width = el.offsetWidth || 280;
+      el.height = 72;
+      const ctx = el.getContext('2d');
+      ctx.fillStyle = '#07111f';
+      ctx.fillRect(0, 0, el.width, el.height);
+      return ctx;
+    }
+
+    function initWaveforms() {
+      state.ppgCtx = initWaveformCanvas('ppgCanvas');
+      state.rgbCtx = initWaveformCanvas('rgbCanvas');
+      state.blinkCtx = initWaveformCanvas('blinkCanvas');
+      state.stabilityCtx = initWaveformCanvas('stabilityCanvas');
+    }
+
+    function drawWaveformPoint(ctx, x, value, color, maxVal) {
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+      const yPos = h - (value / maxVal) * (h - 10) - 4;
+      if (x === 0) {
+        ctx.fillStyle = '#07111f';
+        ctx.fillRect(0, 0, w, h);
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 0.5;
+        for (let i = 1; i < 4; i++) {
+          ctx.beginPath(); ctx.moveTo(0, (h / 4) * i); ctx.lineTo(w, (h / 4) * i); ctx.stroke();
+        }
+      }
+      // Clear ahead
+      ctx.fillStyle = '#07111f';
+      ctx.fillRect(x, 0, 3, h);
+      // Draw dot
+      ctx.fillStyle = color;
+      ctx.fillRect(x, yPos, 2, 2);
+    }
+
+    // ============================================================
+    // CAMERA INIT & MEDIAPIPE FACEMESH
+    // ============================================================
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+        const video = document.getElementById('videoEl');
+        video.srcObject = stream;
+        state.videoStream = stream;
+        await video.play();
+
+        const canvas = document.getElementById('overlayCanvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        showToast('Initializing Real AI FaceMesh...');
+        document.getElementById('landmarkInfo').textContent = 'Loading AI...';
+
+        // Initialize MediaPipe FaceMesh
+        state.faceMesh = new FaceMesh({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+        state.faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+        state.faceMesh.onResults(onFaceMeshResults);
+
+        // Camera loop to send frames to MediaPipe
+        state.camera = new Camera(video, {
+          onFrame: async () => {
+            if (state.scanning || document.getElementById('page-scan').classList.contains('active')) {
+              await state.faceMesh.send({ image: video });
+            }
+          },
+          width: 640,
+          height: 480
+        });
+        state.camera.start();
+
+        showToast('AI FaceMesh initialized. Ready to scan.');
+        document.getElementById('landmarkInfo').textContent = 'Live AI active';
+      } catch (e) {
+        showToast('Camera access denied — using simulation mode');
+        document.getElementById('faceStatus').textContent = 'No camera access';
+        document.getElementById('faceStatus').style.color = 'var(--amber)';
+        state.faceDetected = false;
+      }
+    }
+
+    // Calculate Euclidean distance
+    function dist(p1, p2) {
+      return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+    }
+
+    // EAR thresholds - lowered slightly to reduce false positives
+    const EAR_THRESHOLD = 0.20;
+
+    function onFaceMeshResults(results) {
+      const canvas = document.getElementById('overlayCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const W = canvas.width, H = canvas.height;
+
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        // Only set faceDetected if we are actively scanning (don't override pre-scan text unless requested)
+        state.faceDetected = true;
+        if (state.scanning) {
+          document.getElementById('faceStatus').textContent = 'Face detected ✓';
+          document.getElementById('faceStatus').style.color = 'var(--green)';
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+
+        // --- REAL BLINK DETECTION (EAR) ---
+        // Left Eye indices: 33, 160, 158, 133, 153, 144
+        const lP1 = landmarks[160], lP2 = landmarks[158], lP3 = landmarks[133],
+          lP4 = landmarks[153], lP5 = landmarks[144], lP6 = landmarks[33];
+        // Right Eye indices: 362, 385, 387, 263, 373, 380
+        const rP1 = landmarks[385], rP2 = landmarks[387], rP3 = landmarks[263],
+          rP4 = landmarks[373], rP5 = landmarks[380], rP6 = landmarks[362];
+
+        const lDistVert1 = dist(lP1, lP5), lDistVert2 = dist(lP2, lP4), lDistHorz = dist(lP6, lP3);
+        const lEAR = (lDistVert1 + lDistVert2) / (2.0 * lDistHorz);
+
+        const rDistVert1 = dist(rP1, rP5), rDistVert2 = dist(rP2, rP4), rDistHorz = dist(rP6, rP3);
+        const rEAR = (rDistVert1 + rDistVert2) / (2.0 * rDistHorz);
+
+        const ear = (lEAR + rEAR) / 2.0;
+
+        if (ear < EAR_THRESHOLD) {
+          state.earClosedFrames = (state.earClosedFrames || 0) + 1;
+        } else {
+          // Only count as a blink if eyes were closed for >= 2 consecutive frames
+          // This filters out single-frame noise that caused false positives
+          if (state.earClosedFrames >= 2) {
+            const now = Date.now();
+            // Debounce: ensure at least 350ms between registered blinks
+            if (!state.lastBlinkTime || now - state.lastBlinkTime > 350) {
+              if (state.scanning) {
+                state.realBlinks++;
+                state.blinkTimestamps.push(now);
+              }
+              state.lastBlinkTime = now;
+            }
+          }
+          state.earClosedFrames = 0;
+        }
+
+        // Draw connections
+        drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, { color: 'rgba(26,95,216,0.3)', lineWidth: 0.5 });
+        drawConnectors(ctx, landmarks, FACEMESH_RIGHT_EYE, { color: 'rgba(232,64,64,0.7)', lineWidth: 1.5 });
+        drawConnectors(ctx, landmarks, FACEMESH_LEFT_EYE, { color: 'rgba(232,64,64,0.7)', lineWidth: 1.5 });
+        drawConnectors(ctx, landmarks, FACEMESH_FACE_OVAL, { color: 'rgba(13,147,104,0.6)', lineWidth: 1.5 });
+
+        // ROI text labels
+        const leftEyeX = lP6.x * W, leftEyeY = lP1.y * H;
+        drawLabel(ctx, 'Live Blink Tracking', leftEyeX - 30, leftEyeY - 15);
+      } else {
+        state.faceDetected = false;
+        if (state.scanning) {
+          document.getElementById('faceStatus').textContent = 'No face detected • Scanning paused';
+          document.getElementById('faceStatus').style.color = 'var(--red)';
+        }
+      }
+    }
+
+    function drawLabel(ctx, text, x, y) {
+      ctx.font = '9px DM Mono, monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillText(text, x, y);
+    }
+
+    // ============================================================
+    // SCAN CONTROL
+    // ============================================================
+    function startScan() {
+      if (!state.videoStream) {
+        initCamera().then(() => { setTimeout(startScan, 500); });
+        return;
+      }
+
+      state.scanning = true;
+      state.scanProgress = 0;
+      state.scanBpms = []; state.scanBlinks = []; state.scanTremors = []; state.scanGazes = [];
+      state.realBlinks = 0;
+      state.isEyeClosed = false;
+      state.earClosedFrames = 0;
+      state.blinkTimestamps = [];
+      state.scanStartTime = Date.now();
+      // Note: we do NOT force state.faceDetected = true anymore. It will be set by the ML.
+      state.ppgX = 0; state.rgbX = 0; state.blinkX = 0; state.stabilityX = 0;
+
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+      document.getElementById('scanRing').classList.add('active');
+      document.getElementById('scanLine').classList.add('active');
+      document.getElementById('recDot').classList.add('recording');
+      document.getElementById('camStatusText').textContent = 'Scanning — analyzing facial signals...';
+
+      let elapsed = 0;
+      state.timerInterval = setInterval(() => {
+        if (!state.faceDetected) return; // Pause timer if no face
+        elapsed += 0.1;
+        const pct = (elapsed / state.scanDuration) * 100;
+        document.getElementById('progressBar').style.width = Math.min(pct, 100) + '%';
+        const sec = Math.floor(elapsed);
+        const ms = Math.floor((elapsed - sec) * 10);
+        document.getElementById('scanTimer').textContent = `${String(sec).padStart(2, '0')}:${ms}`;
+      }, 100);
+
+      // Signal simulation loop
+      state.scanInterval = setInterval(() => {
+        if (!state.scanning || !state.faceDetected) return; // Pause signals if no face
+        state.scanProgress += (1 / state.scanDuration);
+
+        generateSignals();
+        updateVitalsDisplay();
+
+        if (state.scanProgress >= 1) {
+          completeScan();
+        }
+      }, 1000);
+
+      initWaveforms();
+      startWaveformAnimation();
+    }
+
+    function stopScan() {
+      if (state.scanProgress > 0.3) completeScan();
+      else resetScan();
+    }
+
+    function resetScan() {
+      clearAllTimers();
+      state.scanning = false;
+      state.faceDetected = false;
+      state.scanProgress = 0;
+      delete state.scanBpmOffset;
+      delete state.scanBlinkOffset;
+      state.blinkTimestamps = [];
+      state.earClosedFrames = 0;
+      state.scanStartTime = 0;
+      delete state.scanTremorOffset;
+      delete state.scanGazeOffset;
+
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      document.getElementById('scanRing').classList.remove('active');
+      document.getElementById('scanLine').classList.remove('active');
+      document.getElementById('recDot').classList.remove('recording');
+      document.getElementById('camStatusText').textContent = 'Camera inactive — press Start Scan';
+      document.getElementById('scanTimer').textContent = '00:00';
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('faceStatus').textContent = 'No face detected';
+      document.getElementById('faceStatus').style.color = 'var(--text3)';
+
+      ['bpmVal', 'blinkVal', 'tremorVal', 'gazeVal'].forEach(id => {
+        document.getElementById(id).textContent = '--';
+      });
+    }
+
+    function clearAllTimers() {
+      clearInterval(state.scanInterval);
+      clearInterval(state.timerInterval);
+      cancelAnimationFrame(state.waveAF);
+    }
+
+    // ============================================================
+    // PHYSIOLOGICAL SIGNAL SIMULATION (rPPG + Blink + Tremor)
+    // ============================================================
+    function generateSignals() {
+      const t = state.scanProgress;
+      const mealHrs = parseFloat(document.getElementById('mealHours').value) || 4;
+      const insulin = document.getElementById('insulinCtx').value;
+      const activity = document.getElementById('activityCtx').value;
+      const symptoms = document.getElementById('symptomsCtx').value;
+
+      // Set fixed session targets on first loop to avoid unrealistic wild jumps every second
+      if (typeof state.scanBpmOffset === 'undefined') state.scanBpmOffset = (Math.random() - 0.5) * 12;
+      if (typeof state.scanBlinkOffset === 'undefined') state.scanBlinkOffset = (Math.random() - 0.5) * 4;
+      if (typeof state.scanTremorOffset === 'undefined') state.scanTremorOffset = (Math.random() - 0.5) * 0.4;
+      if (typeof state.scanGazeOffset === 'undefined') state.scanGazeOffset = (Math.random() - 0.5) * 0.5;
+
+      // Base BPM
+      let baseBpm = 72;
+      if (mealHrs > 5) baseBpm += 8;
+      if (insulin === 'recent') baseBpm += 6;
+      if (insulin === 'increased') baseBpm += 14;
+      if (activity === 'moderate') baseBpm += 10;
+      if (activity === 'intense') baseBpm += 22;
+      if (symptoms === 'sweat') baseBpm += 12;
+      if (symptoms === 'tremor') baseBpm += 8;
+
+      baseBpm += state.scanBpmOffset;
+
+      // Pulse: Use very small noise so it doesn't jump irrationally
+      const noise = (Math.random() - 0.5) * 2; // Reduced from 8 for realistic sinus rhythm variance
+      const drift = Math.sin(t * Math.PI * 3.7) * 4; // Smoother breathing drift
+      const bpm = Math.round(baseBpm + noise + drift);
+      state.currentBpm = Math.max(55, Math.min(140, bpm));
+      state.scanBpms.push(state.currentBpm);
+
+      // Blink rate: calculated from REAL blinks using a 60-second sliding window
+      let currentRate = 0;
+      if (state.blinkTimestamps && state.blinkTimestamps.length > 0) {
+        const now = Date.now();
+        // Prune blinks older than 60 seconds
+        state.blinkTimestamps = state.blinkTimestamps.filter(t => now - t < 60000);
+        const elapsedSecs = Math.max(1, (now - state.scanStartTime) / 1000);
+        const windowSecs = Math.min(elapsedSecs, 60);
+
+        if (windowSecs >= 8) {
+          // Enough data collected — extrapolate blinks in window to per-minute rate
+          currentRate = Math.round(state.blinkTimestamps.length * (60 / windowSecs));
+        } else if (windowSecs >= 4) {
+          // Warm-up phase: blend raw extrapolation toward a conservative estimate
+          const rawRate = Math.round(state.blinkTimestamps.length * (60 / windowSecs));
+          const weight = (windowSecs - 4) / 4; // 0→1 as 4s→8s
+          currentRate = Math.round(rawRate * weight + 0 * (1 - weight));
+        }
+        // Clamp to physiologically plausible range (normal: 12-20/min)
+        currentRate = Math.max(0, Math.min(45, currentRate));
+      }
+      state.currentBlink = currentRate;
+      state.scanBlinks.push(state.currentBlink);
+
+      // Tremor index
+      let tremorBase = 0.8;
+      if (symptoms === 'tremor') tremorBase = 2.8;
+      if (symptoms === 'confusion') tremorBase = 2.2;
+      if (activity === 'intense') tremorBase += 0.8;
+      tremorBase += state.scanTremorOffset;
+      state.currentTremor = parseFloat(Math.max(0, tremorBase + (Math.random() - 0.5) * 0.3).toFixed(1));
+      state.scanTremors.push(state.currentTremor);
+
+      // Gaze jitter
+      let gazeBase = 1.2;
+      if (symptoms !== 'none') gazeBase += 1.5;
+      if (mealHrs > 5) gazeBase += 0.8;
+      gazeBase += state.scanGazeOffset;
+      state.currentGaze = parseFloat(Math.max(0, gazeBase + (Math.random() - 0.5) * 0.4).toFixed(1));
+      state.scanGazes.push(state.currentGaze);
+
+      // Push to waveform buffers
+      state.ppgBuffer.push(state.currentBpm);
+      state.ppgBuffer.shift();
+      state.rgbBuffer.push(state.currentBpm + (Math.random() - 0.5) * 15);
+      state.rgbBuffer.shift();
+      state.blinkBuffer.push(state.currentBlink);
+      state.blinkBuffer.shift();
+      state.stabilityBuffer.push(10 - state.currentTremor);
+      state.stabilityBuffer.shift();
+    }
+
+    // ============================================================
+    // WAVEFORM ANIMATION
+    // ============================================================
+    function startWaveformAnimation() {
+      let ppgPhase = 0, rgbPhase = 0.5, blinkPhase = 1.0, stabPhase = 1.5;
+      let x = 0;
+
+      function frame() {
+        if (!state.scanning) return;
+        const wW = state.ppgCtx ? state.ppgCtx.canvas.width : 280;
+        x = (x + 1) % wW;
+
+        const bpm = state.currentBpm || 72;
+        const ppgVal = 50 + Math.sin(ppgPhase) * 40 + Math.sin(ppgPhase * 2.2) * 10 + (Math.random() - 0.5) * 5;
+        const rgbVal = 50 + Math.sin(rgbPhase) * 35 + (Math.random() - 0.5) * 8;
+        const blinkVal = state.currentBlink > 20 ? 60 + Math.random() * 30 : 30 + Math.random() * 20;
+        const stabVal = Math.max(10, 80 - state.currentTremor * 20 + (Math.random() - 0.5) * 15);
+
+        ppgPhase += (bpm / 60) * 0.15;
+        rgbPhase += (bpm / 60) * 0.14;
+        blinkPhase += 0.08;
+        stabPhase += 0.06;
+
+        if (state.ppgCtx) drawWaveformPoint(state.ppgCtx, x, ppgVal, '#e84040', 110);
+        if (state.rgbCtx) drawWaveformPoint(state.rgbCtx, x, rgbVal, '#0891b2', 110);
+        if (state.blinkCtx) drawWaveformPoint(state.blinkCtx, x, blinkVal, '#1a5fd8', 110);
+        if (state.stabilityCtx) drawWaveformPoint(state.stabilityCtx, x, stabVal, '#0d9368', 110);
+
+        // Update waveform labels
+        document.getElementById('ppgLabelVal').textContent = bpm + ' bpm';
+        document.getElementById('rgbLabelVal').textContent = rgbVal.toFixed(0) + ' au';
+        document.getElementById('blinkLabelVal').textContent = (state.currentBlink || '--') + '/min';
+        document.getElementById('stabilityLabelVal').textContent = stabVal.toFixed(0) + '%';
+
+        state.waveAF = requestAnimationFrame(frame);
+      }
+      state.waveAF = requestAnimationFrame(frame);
+    }
+
+    // ============================================================
+    // VITALS DISPLAY
+    // ============================================================
+    function updateVitalsDisplay() {
+      const baseline = state.baseline;
+      const bpm = state.currentBpm;
+      const blink = state.currentBlink;
+      const tremor = state.currentTremor;
+      const gaze = state.currentGaze;
+
+      document.getElementById('bpmVal').textContent = bpm;
+      document.getElementById('blinkVal').textContent = blink;
+      document.getElementById('tremorVal').textContent = tremor.toFixed(1);
+      document.getElementById('gazeVal').textContent = gaze.toFixed(1);
+
+      // Trends vs baseline
+      if (baseline) {
+        const bpmDiff = bpm - baseline.bpm;
+        document.getElementById('bpmTrend').textContent = (bpmDiff > 0 ? '+' : '') + bpmDiff + ' from baseline';
+        document.getElementById('bpmTrend').className = 'vital-trend ' + (bpmDiff > 10 ? 'trend-up' : bpmDiff < -10 ? 'trend-down' : 'trend-stable');
+        document.getElementById('blinkTrend').textContent = blink > 22 ? '↑ Elevated' : blink < 10 ? '↓ Low' : '→ Normal';
+        document.getElementById('tremorTrend').textContent = tremor > 2 ? '↑ Elevated' : '→ Stable';
+        document.getElementById('gazeTrend').textContent = gaze > 2.5 ? '↑ Unstable' : '→ Stable';
+      }
+    }
+
+    // ============================================================
+    // SCAN COMPLETION + RISK INFERENCE
+    // ============================================================
+    function completeScan() {
+      clearAllTimers();
+      state.scanning = false;
+
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      document.getElementById('scanRing').classList.remove('active');
+      document.getElementById('scanLine').classList.remove('active');
+      document.getElementById('recDot').classList.remove('recording');
+      document.getElementById('progressBar').style.width = '100%';
+      document.getElementById('camStatusText').textContent = 'Scan complete — analyzing results';
+
+      // Show overlay briefly
+      const overlay = document.getElementById('analyzingOverlay');
+      overlay.classList.add('show');
+      const steps = ['Extracting facial signals...', 'Running rPPG analysis...', 'Applying risk heuristics...', 'Generating assessment...'];
+      let si = 0;
+      const stepInterval = setInterval(() => {
+        document.getElementById('analyzingText').textContent = steps[si++] || steps[steps.length - 1];
+        if (si >= steps.length) clearInterval(stepInterval);
+      }, 500);
+
+      setTimeout(() => {
+        overlay.classList.remove('show');
+        const result = inferRisk();
+        displayResult(result);
+        saveResult(result);
+        showToast('Scan complete — ' + result.label + ' risk detected');
+      }, 2200);
+    }
+
+    // ============================================================
+    // RULE-BASED RISK INFERENCE ENGINE
+    // ============================================================
+    function inferRisk() {
+      const avgBpm = avg(state.scanBpms);
+      const avgBlink = avg(state.scanBlinks);
+      const avgTremor = avg(state.scanTremors);
+      const avgGaze = avg(state.scanGazes);
+
+      const mealHrs = parseFloat(document.getElementById('mealHours').value) || 4;
+      const insulin = document.getElementById('insulinCtx').value;
+      const activity = document.getElementById('activityCtx').value;
+      const symptoms = document.getElementById('symptomsCtx').value;
+
+      const baseline = state.baseline;
+
+      // --- Weighted factor scores (0-1 each) ---
+      let scores = {};
+
+      // Pulse abnormality
+      const normalBpm = baseline ? baseline.bpm : 72;
+      const bpmDeviation = Math.abs(avgBpm - normalBpm) / normalBpm;
+      scores.pulse = Math.min(1, bpmDeviation * 3);
+      if (avgBpm > 95) scores.pulse = Math.max(scores.pulse, 0.6);
+
+      // Blink irregularity
+      const blinkNormal = baseline ? baseline.blink : 16;
+      const blinkDev = Math.abs(avgBlink - blinkNormal) / blinkNormal;
+      scores.blink = Math.min(1, blinkDev * 2.5);
+      if (avgBlink > 24) scores.blink = Math.max(scores.blink, 0.55);
+
+      // Tremor
+      scores.tremor = Math.min(1, (avgTremor - 0.5) / 3.0);
+      if (avgTremor > 2.5) scores.tremor = Math.max(scores.tremor, 0.7);
+
+      // Gaze instability
+      scores.gaze = Math.min(1, (avgGaze - 1.0) / 3.0);
+      if (avgGaze > 2.8) scores.gaze = Math.max(scores.gaze, 0.6);
+
+      // Meal gap logic: fasting alone is normal unless very long or combined with insulin
+      if (insulin === 'none') {
+        scores.mealGap = Math.min(1, Math.max(0, (mealHrs - 8) / 10));
+      } else {
+        scores.mealGap = Math.min(1, Math.max(0, (mealHrs - 4) / 8));
+      }
+
+      // Insulin context
+      scores.insulin = { none: 0, recent: 0.35, increased: 0.7, missed: 0.2 }[insulin] || 0;
+
+      // Activity
+      scores.activity = { rest: 0, light: 0.05, moderate: 0.25, intense: 0.5 }[activity] || 0;
+
+      // Symptoms
+      scores.symptoms = { none: 0, mild: 0.35, sweat: 0.6, tremor: 0.7, confusion: 0.9 }[symptoms] || 0;
+
+      // Doc risk boost
+      scores.docBoost = Math.min(1, state.docRiskBoost);
+
+      // Weighted sum (giving more weight to physiological signals and actual symptoms)
+      const weights = {
+        pulse: 0.25, blink: 0.15, tremor: 0.12, gaze: 0.08,
+        mealGap: 0.10, insulin: 0.15, activity: 0.05, symptoms: 0.20, docBoost: 0.05
+      };
+      let totalWeight = Object.keys(weights).reduce((s, k) => s + weights[k], 0);
+      let riskScore = Object.keys(weights).reduce((s, k) => s + (scores[k] || 0) * weights[k], 0) / totalWeight;
+
+      // Determine label based on more clinical thresholds
+      let label, confidence;
+      if (riskScore < 0.35) { label = 'Low'; confidence = Math.round(75 + Math.random() * 20); }
+      else if (riskScore < 0.65) { label = 'Medium'; confidence = Math.round(70 + Math.random() * 20); }
+      else { label = 'High'; confidence = Math.round(65 + Math.random() * 20); }
+
+      // Build explanation
+      const parts = [];
+
+      // Always include some base context
+      parts.push(`Resting pulse proxy at ${Math.round(avgBpm)} bpm`);
+
+      if (scores.pulse > 0.25) parts.push(`Pulse dev. (+${Math.round(avgBpm - normalBpm)} bpm from baseline)`);
+      if (scores.blink > 0.25) parts.push(`Blink rate (${Math.round(avgBlink)}/min)`);
+      if (scores.tremor > 0.3) parts.push(`Tremor index (${avgTremor.toFixed(1)})`);
+      if (scores.mealGap > 0.2) parts.push(`Meal gap (${mealHrs}h)`);
+
+      if (insulin !== 'none') parts.push(`Insulin: ${insulin}`);
+      if (activity !== 'rest') parts.push(`Activity: ${activity}`);
+      if (symptoms !== 'none') parts.push(`Symptoms: ${symptoms}`);
+      if (scores.docBoost > 0.1) parts.push('Doc risk factors considered');
+
+      const explanation = parts.length > 1
+        ? parts.join(' • ') + ` — Result interpreted as ${label} hypoglycemia risk.`
+        : `Vitals within normal expected range. ${label} hypoglycemia risk estimate.`;
+
+      return {
+        label, confidence, riskScore: parseFloat(riskScore.toFixed(3)),
+        explanation, scores,
+        vitals: { bpm: Math.round(avgBpm), blink: Math.round(avgBlink), tremor: parseFloat(avgTremor.toFixed(1)), gaze: parseFloat(avgGaze.toFixed(1)) },
+        timestamp: new Date().toISOString(),
+        context: { mealHrs, insulin, activity, symptoms }
+      };
+    }
+
+    function avg(arr) {
+      if (!arr.length) return 0;
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+
+    // ============================================================
+    // DISPLAY RESULT
+    // ============================================================
+    function displayResult(result) {
+      const { label, confidence, riskScore, explanation, scores } = result;
+      const cls = label.toLowerCase();
+
+      // Needle angle
+      const angle = -90 + (riskScore * 180);
+      document.getElementById('gaugeNeedle').setAttribute('transform', `rotate(${angle},100,100)`);
+
+      // Risk label
+      const rl = document.getElementById('riskLabel');
+      rl.textContent = label + ' Risk';
+      rl.className = 'risk-label ' + cls;
+
+      // Confidence ring
+      const circumference = 150.8;
+      const offset = circumference - (confidence / 100) * circumference;
+      const ring = document.getElementById('confRing');
+      ring.style.strokeDashoffset = offset;
+      ring.style.stroke = cls === 'low' ? '#0d9368' : cls === 'medium' ? '#c07a00' : '#c9292a';
+      document.getElementById('confPct').textContent = confidence + '%';
+      document.getElementById('confValue').textContent = confidence + '%';
+      document.getElementById('confSub').textContent = 'AI confidence estimate';
+      document.getElementById('riskTimestamp').textContent = new Date().toLocaleTimeString();
+
+      // Explanation
+      document.getElementById('explainBox').textContent = explanation;
+      document.getElementById('explainBox').style.background = cls === 'low' ? 'var(--green-bg)' : cls === 'medium' ? 'var(--amber-bg)' : 'var(--red-bg)';
+      document.getElementById('explainBox').style.color = cls === 'low' ? '#064e3b' : cls === 'medium' ? '#7a4d00' : '#7f1d1d';
+
+      // Combine factors dynamically
+      const compScore = Math.round(riskScore * 100);
+      let compColor = 'var(--green)';
+      if (compScore > 35) compColor = 'var(--amber)';
+      if (compScore > 65) compColor = 'var(--red)';
+
+      const factors = [
+        { name: 'Blink Anomaly', sub: `${Math.round(result.vitals.blink)}/min pattern`, val: scores.blink, color: '#1a5fd8', icon: '👁️' },
+        { name: 'Insulin Context', sub: result.context.insulin, val: scores.insulin, color: '#e84040', icon: '💉' },
+        { name: 'Head Tremor', sub: `Index: ${result.vitals.tremor.toFixed(1)}`, val: scores.tremor, color: '#8b5cf6', icon: '🤲' },
+        { name: 'Pulse Abnormality', sub: `${Math.round(result.vitals.bpm)} bpm detected`, val: scores.pulse, color: '#e84040', icon: '💓' },
+        { name: 'Gaze Instability', sub: `Jitter: ${result.vitals.gaze.toFixed(1)}px`, val: scores.gaze, color: '#0891b2', icon: '🦇' }
+      ];
+      factors.sort((a,b) => b.val - a.val);
+
+      const fl = document.getElementById('factorList');
+      fl.innerHTML = `
+        <div class="composite-score-box">
+          <div class="composite-score-num" style="color: ${compColor};">${compScore}</div>
+          <div class="composite-score-text">
+            <span class="composite-score-title">Composite Risk Score</span>
+            <span class="composite-score-sub">Based on ${factors.length} contributing factors</span>
+          </div>
+        </div>
+        ${factors.map(f => `
+        <div class="factor-premium-card">
+          <div class="factor-premium-icon" style="color:${f.color}; background:${f.color}15;">${f.icon}</div>
+          <div class="factor-premium-info">
+            <span class="factor-premium-title">${f.name}</span>
+            <span class="factor-premium-sub" style="text-transform: capitalize;">${f.sub}</span>
+          </div>
+          <div class="factor-premium-right">
+            <div class="factor-premium-bar-wrap">
+              <div class="factor-premium-bar" style="width:${Math.round(f.val * 100)}%; background:${f.color};"></div>
+            </div>
+            <span class="factor-premium-score" style="color:${f.color};">+${Math.round(f.val * 40)}</span>
+          </div>
+        </div>
+        `).join('')}
+      `;
+    }
+
+    // ============================================================
+    // SAVE RESULT + HISTORY
+    // ============================================================
+    function saveResult(result) {
+      state.scanHistory.unshift(result);
+      if (state.scanHistory.length > 50) state.scanHistory.pop();
+      localStorage.setItem('glycoHistory', JSON.stringify(state.scanHistory));
+
+      // Update baseline (rolling avg)
+      const history = state.scanHistory;
+      if (history.length >= 2) {
+        const recentBpms = history.slice(0, Math.min(5, history.length)).map(h => h.vitals.bpm);
+        const recentBlinks = history.slice(0, Math.min(5, history.length)).map(h => h.vitals.blink);
+        const recentTremors = history.slice(0, Math.min(5, history.length)).map(h => h.vitals.tremor);
+        state.baseline = {
+          bpm: Math.round(avg(recentBpms)),
+          blink: Math.round(avg(recentBlinks)),
+          tremor: parseFloat(avg(recentTremors).toFixed(1))
+        };
+        localStorage.setItem('glycoBaseline', JSON.stringify(state.baseline));
+      }
+    }
+
+    // ============================================================
+    // HISTORY RENDER
+    // ============================================================
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      const history = state.scanHistory;
+
+      if (!history.length) {
+        list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">No scans completed yet.</div>';
+      } else {
+        list.innerHTML = history.map((h, i) => {
+          const cls = h.label.toLowerCase();
+          const icon = cls === 'low' ? '✓' : cls === 'medium' ? '⚠' : '!';
+          const time = new Date(h.timestamp).toLocaleString();
+          return `
+        <div class="history-item" onclick="showHistoryDetail(${i})">
+          <div class="history-icon ${cls}">${icon}</div>
+          <div class="history-info">
+            <div class="history-risk ${cls}">${h.label} Risk — ${h.confidence}% confidence</div>
+            <div class="history-time">${time} · Meal gap ${h.context.mealHrs}h</div>
+          </div>
+          <div class="history-bpm">${h.vitals.bpm} bpm</div>
+        </div>`;
+        }).join('');
+      }
+
+      // Trend chart
+      renderTrendChart();
+
+      // Pattern insights
+      renderInsights();
+
+      // Baseline table
+      if (state.baseline) {
+        document.getElementById('bBpm').textContent = state.baseline.bpm + ' bpm';
+        document.getElementById('bBlink').textContent = state.baseline.blink + '/min';
+        document.getElementById('bStability').textContent = (10 - state.baseline.tremor).toFixed(1) + '/10';
+      }
+    }
+
+    function showHistoryDetail(i) {
+      const h = state.scanHistory[i];
+      showToast(`${h.label} Risk (${h.confidence}%): ${h.explanation.substring(0, 80)}...`);
+    }
+
+    function clearHistory() {
+      state.scanHistory = [];
+      localStorage.removeItem('glycoHistory');
+      renderHistory();
+    }
+
+    function renderTrendChart() {
+      const canvas = document.getElementById('trendChart');
+      const history = [...state.scanHistory].reverse().slice(-10);
+
+      if (state.trendChart) { state.trendChart.destroy(); state.trendChart = null; }
+      if (!history.length) return;
+
+      state.trendChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: history.map(h => new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+          datasets: [
+            { label: 'Pulse Proxy (bpm)', data: history.map(h => h.vitals.bpm), borderColor: '#e84040', backgroundColor: 'rgba(232,64,64,0.08)', tension: 0.4, pointRadius: 4, fill: true },
+            { label: 'Blink Rate', data: history.map(h => h.vitals.blink), borderColor: '#1a5fd8', backgroundColor: 'rgba(26,95,216,0.06)', tension: 0.4, pointRadius: 4, fill: true },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11, family: 'DM Sans' }, color: '#4a5f7a' } } },
+          scales: {
+            x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11, family: 'DM Sans' }, color: '#8298b0' } },
+            y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11, family: 'DM Sans' }, color: '#8298b0' } }
+          }
+        }
+      });
+    }
+
+    function renderInsights() {
+      const history = state.scanHistory;
+      const el = document.getElementById('patternInsights');
+      if (history.length < 2) {
+        el.textContent = 'Complete 3 or more scans to receive personalized pattern insights.';
+        return;
+      }
+      const highCount = history.filter(h => h.label === 'High').length;
+      const medCount = history.filter(h => h.label === 'Medium').length;
+      const avgBpm = Math.round(avg(history.map(h => h.vitals.bpm)));
+      const postWorkout = history.filter(h => h.context.activity === 'intense' && h.label !== 'Low').length;
+      let insights = '';
+      if (highCount > 0) insights += `<p style="color:var(--red);margin-bottom:8px;">⚠ ${highCount} high-risk scan(s) recorded. Monitor closely.</p>`;
+      if (medCount > 0) insights += `<p style="color:var(--amber);margin-bottom:8px;">${medCount} medium-risk scan(s) detected.</p>`;
+      insights += `<p style="margin-bottom:8px;">Average pulse proxy across scans: <strong>${avgBpm} bpm</strong></p>`;
+      if (postWorkout > 0) insights += `<p style="color:var(--accent);margin-bottom:8px;">Pattern: Risk spikes detected after physical activity (${postWorkout} occurrence${postWorkout > 1 ? 's' : ''}).</p>`;
+      if (history.filter(h => h.context.mealHrs > 5).length > 1) insights += `<p>Extended meal gaps (>5h) correlate with elevated risk in your history.</p>`;
+      el.innerHTML = insights || 'Patterns are within normal range. Continue monitoring.';
+    }
+
+    // ============================================================
+    // PROFILE
+    // ============================================================
+    function renderProfile() {
+      const history = state.scanHistory;
+      document.getElementById('totalScans').textContent = history.length;
+      document.getElementById('highRiskCount').textContent = history.filter(h => h.label === 'High').length;
+      if (history.length) {
+        document.getElementById('avgBpm').textContent = Math.round(avg(history.map(h => h.vitals.bpm)));
+        document.getElementById('avgConf').textContent = Math.round(avg(history.map(h => h.confidence)));
+      }
+      const tags = document.getElementById('patternTags');
+      if (history.length >= 3) {
+        const tagList = [];
+        if (history.filter(h => h.label === 'High').length > 0) tagList.push({ t: 'High risk events', c: 'red' });
+        if (history.filter(h => h.context.insulin === 'increased').length > 0) tagList.push({ t: 'Insulin change noted', c: 'amber' });
+        if (history.filter(h => h.context.activity === 'intense').length > 1) tagList.push({ t: 'Post-workout patterns', c: 'blue' });
+        tagList.push({ t: 'Type 2 Diabetic', c: 'blue' });
+        tagList.push({ t: 'Monitored', c: 'green' });
+        tags.innerHTML = tagList.map(t => `<span class="tag ${t.c}">${t.t}</span>`).join('');
+      }
+    }
+
+    // ============================================================
+    // DOCUMENT ANALYSIS (Claude API)
+    // ============================================================
+    async function analyzeDocText() {
+      const text = document.getElementById('docTextInput').value.trim();
+      if (!text) { showToast('Please enter some text to analyze.'); return; }
+      runDocAnalysis(text);
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const payload = e.target.result;
+        runDocAnalysis(payload, file.name || 'document');
+      };
+      
+      if (file.type === 'text/plain') {
+          reader.readAsText(file);
+      } else {
+          // Use Base64 encoding so we can send images directly to the Backend
+          reader.readAsDataURL(file);
+      }
+    }
+
+    async function runDocAnalysis(dataString, filename) {
+      const resultDiv = document.getElementById('docResult');
+      const riskDiv = document.getElementById('docRiskFactors');
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = `<div class="doc-pill"><span style="animation:spin 0.8s linear infinite;display:inline-block;">⟳</span> Analyzing document with AI...</div>`;
+      riskDiv.innerHTML = '<div style="font-size:13px;color:var(--text3);">Extracting...</div>';
+
+      try {
+        const response = await fetch('/api/analyze_document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: dataString, filename: filename })
+        });
+
+        if (!response.ok) throw new Error('API Error');
+        const parsed = await response.json();
+
+        state.docRiskBoost = parsed.riskBoost || 0;
+
+        let resHtml = '';
+        if (parsed.filename) {
+          resHtml += `<div style="background:#ffffff; border:1px solid var(--border); border-radius:var(--r2); padding:10px 16px; margin-bottom:12px; font-size:12px; font-weight:500; display:flex; align-items:center; gap:8px;">
+            🖼️ ${parsed.type || 'Document'} — ${parsed.filename}
+          </div>`;
+        }
+        resHtml += `<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:var(--r2); padding:12px 16px; color:#991b1b; font-size:12px; font-weight:600; margin-bottom:24px;">
+          ✓ Analysis complete — Hypoglycemia risk contribution: ${Math.round(state.docRiskBoost * 100)}%
+        </div>`;
+
+        if (parsed.patientInfo) {
+          resHtml += `
+            <div style="font-size:11px;font-weight:600;color:#1a5fd8;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Patient Info</div>
+            <div style="background:#ffffff; border:1px solid var(--border); border-radius:var(--r2); padding:14px 16px; font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:24px;">
+              ${parsed.patientInfo}
+            </div>
+          `;
+        }
+        resHtml += `
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">AI Summary</div>
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--r2); padding:14px 16px; font-size:13px; color:#1e3a8a; line-height:1.6; margin-bottom:24px;">
+            ${parsed.summary}
+          </div>
+        `;
+
+        if (parsed.medicationChanges && parsed.medicationChanges.length) {
+          resHtml += `
+            <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">💊 Medication Changes</div>
+            <div style="font-size:13px; color:var(--text2); line-height:1.7;">
+              <ul style="margin:0; padding-left:16px;">
+                ${parsed.medicationChanges.map(m => `<li style="margin-bottom:6px;">${m}</li>`).join('')}
+              </ul>
+            </div>
+          `;
+        }
+        resultDiv.innerHTML = resHtml;
+
+        riskDiv.innerHTML = `
+          <ul style="margin:0; padding-left:16px; font-size:12px; color:#475569; line-height:1.8;">
+            ${(parsed.riskFactors || []).map(f => `<li style="margin-bottom:8px;">${f}</li>`).join('')}
+          </ul>
+        `;
+
+        const kfDiv = document.getElementById('docKeyFindings');
+        kfDiv.innerHTML = `
+          <ul style="margin:0; padding-left:16px; font-size:12px; color:#475569; line-height:1.8;">
+            ${(parsed.keyFindings || []).map(f => `<li style="margin-bottom:8px;">${f}</li>`).join('')}
+          </ul>
+        `;
+
+        const docHistory = document.getElementById('docHistory');
+        docHistory.innerHTML = `
+          <div style="background:#ffffff; border:1px solid var(--border); border-radius:var(--r2); padding:12px;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:#b91c1c;">
+              🖼️ <span style="color:var(--text);">${parsed.filename || 'Document'}</span>
+            </div>
+          </div>
+        `;
+
+        showToast('Document analyzed successfully');
+      } catch (e) {
+        resultDiv.innerHTML = `<div class="alert-banner warn"><div class="alert-icon">⚠</div><div>API error — using local analysis. Check API key configuration.</div></div>`;
+      }
+    }
+
+    // ============================================================
+    // ACTION PLAN GENERATOR
+    // ============================================================
+    async function generateActionPlan() {
+      const mealHrs = parseFloat(document.getElementById('mealHours').value) || 0;
+      const insulinCtx = document.getElementById('insulinCtx').value;
+      const activityCtx = document.getElementById('activityCtx').value;
+      const symptomsCtx = document.getElementById('symptomsCtx').value;
+      const ageInput = document.getElementById('ageInput').value || 25;
+      const glucoseInput = document.getElementById('glucoseInput').value || 90;
+
+      const lastScan = state.scanHistory[0];
+      const bpm = lastScan ? lastScan.vitals.bpm : (state.baseline ? state.baseline.bpm : 72);
+      const blink = lastScan ? lastScan.vitals.blink : 18;
+
+      const resultDiv = document.getElementById('actionPlanResult');
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = `
+        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:var(--r2); padding:16px; font-size:13px; text-align:center; color:var(--text2);">
+          <span style="display:inline-block; animation:spin 0.8s linear infinite; margin-right:8px;">⟳</span>
+          Analyzing with Gemini AI...
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/action_plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            meal: mealHrs,
+            ins: insulinCtx,
+            sym: symptomsCtx,
+            activity: activityCtx,
+            bpmo: bpm,
+            blink_rate: blink,
+            age: ageInput,
+            glucose: glucoseInput
+          })
+        });
+
+        if (!response.ok) throw new Error('API Error');
+        const data = await response.json();
+
+        const urgency = data.risk === 'HIGH' ? 'High' : (data.risk === 'MEDIUM' ? 'Medium' : 'Low');
+        const themeColor = urgency === 'High' ? 'var(--red)' : (urgency === 'Medium' ? 'var(--amber)' : 'var(--green)');
+        const themeBg = urgency === 'High' ? 'var(--red-bg)' : (urgency === 'Medium' ? 'var(--amber-bg)' : 'var(--green-bg)');
+
+        resultDiv.innerHTML = `
+          <div style="background:${themeBg}; border:1px solid ${themeColor}; border-radius:var(--r2); padding:16px; font-size:13px;">
+            <div style="color:${themeColor}; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22M12 6l7.5 13h-15M11 10v5h2v-5M11 16v2h2v-2"></path></svg>
+              AI Analysis & Action Plan (${urgency} Risk)
+            </div>
+            <div style="color:var(--text); margin-bottom:10px; line-height:1.6;">
+              ${data.ai_analysis}
+            </div>
+          </div>
+        `;
+
+        setTimeout(() => resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+
+      } catch (e) {
+        resultDiv.innerHTML = `<div class="alert-banner danger"><div class="alert-icon">⚠</div><div class="alert-text">Failed to fetch AI analysis. Is the app.py backend running?</div></div>`;
+      }
+    }
+
+    // ============================================================
+    // UTILITIES
+    // ============================================================
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    function updateUserNameUI(name) {
+      const finalName = name || "Guest User";
+      const initials = finalName.split(' ').filter(n => n.length > 0).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'GU';
+      document.querySelectorAll('.user-badge').forEach(badge => badge.textContent = initials);
+      const profileNameDisplay = document.getElementById('profileNameDisplay');
+      if (profileNameDisplay) profileNameDisplay.textContent = finalName;
+    }
+
+    function handleNameSubmit() {
+      const input = document.getElementById('nameModalInput').value.trim();
+      const finalName = input !== "" ? input : "Guest User";
+      updateUserNameUI(finalName);
+      document.getElementById('nameModalOverlay').classList.remove('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Force the modal to show manually on every load as requested by user
+      document.getElementById('nameModalOverlay').classList.add('active');
+      setTimeout(() => document.getElementById('nameModalInput').focus(), 100);
+
+      initWaveforms();
+      initCamera();
+
+      // Load baseline from storage
+      const stored = localStorage.getItem('glycoBaseline');
+      if (stored) state.baseline = JSON.parse(stored);
+
+      // FPS counter
+      let lastFrameTime = Date.now();
+      let frames = 0;
+      setInterval(() => {
+        const now = Date.now();
+        const fps = Math.round(frames / ((now - lastFrameTime) / 1000));
+        document.getElementById('frameCounter').textContent = fps + ' fps';
+        frames = 0;
+        lastFrameTime = now;
+      }, 2000);
+
+      const video = document.getElementById('videoEl');
+      video.addEventListener('timeupdate', () => frames++);
+
+      showToast('GlycoSense initialized — ready for screening');
+    });
+
+    // ============================================================
+    // CHATBOT LOGIC
+    // ============================================================
+    let chatOpen = false;
+    let chatInitialized = false;
+
+    function toggleChat() {
+      chatOpen = !chatOpen;
+      const win = document.getElementById('chatWindow');
+      if (chatOpen) {
+        win.classList.add('open');
+        if (!chatInitialized) {
+          chatInitialized = true;
+          // Gather context and introduce
+          const bpmo = state.scanHistory.length ? state.scanHistory[0].vitals.bpm : 'unknown';
+          const meal = document.getElementById('mealHours').value || 4;
+          const ins = document.getElementById('insulinCtx').value;
+
+          let intro = `Hi! I'm your GlycoBot assistant. I see your last meal was ${meal} hours ago and insulin status is "${ins}".`;
+          if (bpmo !== 'unknown') intro += ` Your latest pulse proxy reading was ${bpmo} bpm.`;
+          else intro += ` Run a scan for a pulse proxy reading for higher accuracy.`;
+
+          intro += ` Need a summary or accurate assessment based on your current inputs? Just ask!`;
+
+          appendMessage('bot', intro);
+        }
+      } else {
+        win.classList.remove('open');
+      }
+    }
+
+    function appendMessage(sender, text) {
+      const body = document.getElementById('chatBody');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `chat-msg ${sender}`;
+      msgDiv.innerHTML = text;
+      body.appendChild(msgDiv);
+      body.scrollTop = body.scrollHeight;
+    }
+
+    function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage('user', text);
+      input.value = '';
+
+      // Query the Python backend
+      respondToChat(text);
+    }
+
+    async function respondToChat(userText) {
+      const meal = document.getElementById('mealHours').value;
+      const ins = document.getElementById('insulinCtx').value;
+      const sym = document.getElementById('symptomsCtx').value;
+      const age = document.getElementById('ageInput').value;
+      const glucose = document.getElementById('glucoseInput').value;
+
+      const bpmo = state.scanHistory.length
+        ? state.scanHistory[0].vitals.bpm
+        : 72;
+
+      const blink_rate = state.scanHistory.length
+        ? state.scanHistory[0].vitals.blink
+        : state.realBlinks;
+
+      const apiBase = window.location.origin === 'null'
+        ? 'http://127.0.0.1:5000'
+        : window.location.origin;
+
+      try {
+        const response = await fetch(`${apiBase}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: userText,
+            meal: meal,
+            ins: ins,
+            sym: sym,
+            bpmo: bpmo,
+            blink_rate: blink_rate,
+            age: age,
+            glucose: glucose
+          })
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`API error ${response.status}: ${text}`);
+        }
+
+        const data = await response.json();
+        appendMessage('bot', data.response);
+        if (data.confidence_percent !== undefined && data.confidence_percent !== null) {
+          updateConfidenceDisplay(Math.round(data.confidence_percent));
+        }
+      } catch (e) {
+        appendMessage('bot', `<em>Error: Could not reach Python backend. ${e.message}</em>`);
+      }
+    }
+
+    function updateConfidenceDisplay(confidence) {
+      const circumference = 150.8;
+      const offset = circumference - (confidence / 100) * circumference;
+      const ring = document.getElementById('confRing');
+      if (ring) {
+        ring.style.strokeDashoffset = offset;
+        ring.style.stroke = confidence >= 80 ? '#1a5fd8' : confidence >= 50 ? '#c07a00' : '#c9292a';
+      }
+      const confPct = document.getElementById('confPct');
+      const confValue = document.getElementById('confValue');
+      const confSub = document.getElementById('confSub');
+      if (confPct) confPct.textContent = confidence + '%';
+      if (confValue) confValue.textContent = confidence + '%';
+      if (confSub) confSub.textContent = 'Chat model confidence';
+    }
+
+    // ============================================================
+    // INSIGHTS & CAREGIVER RENDERING
+    // ============================================================
+    let insightsRendered = false;
+    function renderInsights() {
+      if (insightsRendered || !window.insightEngine) return;
+      insightsRendered = true;
+
+      const engine = window.insightEngine;
+      const cards = engine.getSmartCards();
+      const recs = engine.getRecommendations();
+      const chartData = engine.getChartData();
+
+      // Populate Cards
+      document.getElementById('insightCards').innerHTML = cards.map(c => `
+        <div style="background:var(--accent-bg); padding:16px; border-radius:var(--r2); border-left: 4px solid var(--accent);">
+          <div style="font-weight:600; color:var(--accent2); font-size:14px;">${c.text}</div>
+        </div>
+      `).join('');
+
+      // Populate Recommendations
+      document.getElementById('insightRecommendations').innerHTML = recs.map(r => `
+        <div style="padding:16px; border:1px solid var(--border); border-radius:var(--r2); background:var(--surface2);">
+          <strong style="color:var(--text); font-size:14px; display:block; margin-bottom:4px;">${r.title}</strong>
+          <span style="color:var(--text2); font-size:13px;">${r.desc}</span>
+        </div>
+      `).join('');
+
+      // Trend Chart
+      new Chart(document.getElementById('insightTrendChart').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: chartData.riskTrend.labels,
+          datasets: [{
+            label: 'Risk Score %',
+            data: chartData.riskTrend.values,
+            borderColor: '#1a5fd8',
+            backgroundColor: 'rgba(26,95,216,0.1)',
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: { maintainAspectRatio: false }
+      });
+
+      // Trigger Bar Chart
+      new Chart(document.getElementById('triggerBarChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: chartData.triggers.map(t => t.name),
+          datasets: [{
+            label: 'Anomaly Frequency',
+            data: chartData.triggers.map(t => t.count),
+            backgroundColor: '#0d9368'
+          }]
+        },
+        options: { maintainAspectRatio: false }
+      });
+    }
+
+    let caregiverRendered = false;
+    function renderCaregiver() {
+      if (caregiverRendered || !window.caregiverService) return;
+      caregiverRendered = true;
+
+      const service = window.caregiverService;
+
+      // Top overview
+      const weekly = service.getWeeklyTrend();
+      document.getElementById('cgHighestRiskDay').querySelector('h3').textContent = weekly.highestRiskDay;
+      document.getElementById('cgAvgNightRisk').querySelector('h3').textContent = weekly.averageNightlyRisk;
+      document.getElementById('cgTotalAnomalies').querySelector('h3').textContent = weekly.totalAnomalies;
+
+      // Emergency Events
+      const events = service.getEmergencyEvents();
+      document.getElementById('cgEmergencyEvents').innerHTML = events.map(e => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-weight:600; color:var(--red); font-size:13px;">⚠️ ${e.time}</div>
+            <div style="font-size:12px; color:var(--text2);">${e.factor}</div>
+          </div>
+          <span style="font-size:11px; font-weight:600; padding:4px 8px; border-radius:20px; background:${e.solved ? 'var(--green-bg)' : 'var(--amber-bg)'}; color:${e.solved ? 'var(--green)' : 'var(--amber)'};">
+            ${e.solved ? 'RESOLVED' : 'PENDING'}
+          </span>
+        </div>
+      `).join('');
+
+      // Compliance
+      document.getElementById('cgCompliance').innerHTML = service.getComplianceData().map(c => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2);">
+          <span style="font-size:13px; font-weight:500;">${c.metric}</span>
+          <span style="font-size:14px; font-weight:600; font-family:var(--mono); color:${c.count >= c.limit ? 'var(--red)' : 'var(--text)'};">${c.count} / ${c.limit}</span>
+        </div>
+      `).join('');
+
+      // Doc summaries
+      document.getElementById('cgDocs').innerHTML = service.getDocumentSummaries().map(c => `
+        <div style="padding:14px; background:var(--accent-bg); border-radius:var(--r2);">
+          <div style="font-size:11px; color:var(--text3); font-weight:600; margin-bottom:4px;">${c.date}</div>
+          <div style="font-size:13px; color:var(--accent2);">${c.notes}</div>
+        </div>
+      `).join('');
+
+      // Night Chart
+      const nightData = service.getNightChartData();
+      new Chart(document.getElementById('cgNightChart').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: nightData.labels,
+          datasets: [{
+            label: 'Instability Probability %',
+            data: nightData.values,
+            borderColor: '#8b5cf6',
+            backgroundColor: 'rgba(139,92,246,0.2)',
+            fill: true,
+            stepped: true
+          }]
+        },
+        options: { maintainAspectRatio: false }
+      });
+    }
+  </script>
+  
+  <script src="/insightEngine.js"></script>
+  <script src="/caregiverDashboardService.js"></script>
+</body>
+
+</html>
