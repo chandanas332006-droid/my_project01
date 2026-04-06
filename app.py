@@ -18,7 +18,7 @@ with open("model.pkl", "rb") as f:
 # -------------------------------
 # Better: set GEMINI_API_KEY in environment variables
 # and use os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIzaSyC-6l_p4hNSOJMWCF8s64vytnSXoFJRyBg"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIzaSyBWtloQ01tzR71Zb8WBtN0Fhe6inHrYlKo"))
 gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 
 
