@@ -18,14 +18,14 @@ with open("model.pkl", "rb") as f:
 # -------------------------------
 # Better: set GEMINI_API_KEY in environment variables
 # and use os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIzaSyBWtloQ01tzR71Zb8WBtN0Fhe6inHrYlKo"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIzaSyBWtloQ01tzR71Zb8WBtN0Fhe6inHrYlKoAIzaSyCMgDOPPFlR00oNsE-MpvukBdsCdEGtv3M"))
 gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 # -------------------------------
 # GEN AI FUNCTION FOR CHAT
 # -------------------------------
-def generate_ai_explanation(age, glucose, pulse, blink, meal_gap, symptom, risk):
+def generate_ai_explanation(age, glucose, pulse, blink, gaze, meal_gap, symptom, risk):
     prompt = f"""
 You are a smart health assistant in a hypoglycemia monitoring system.
 Do NOT diagnose diseases or claim certainty.
@@ -35,6 +35,7 @@ User context:
 - Glucose: {glucose} mg/dL
 - Pulse: {pulse} bpm
 - Blink rate: {blink} blinks/min
+- Gaze instability: {gaze} (higher values indicate more jitter)
 - Meal gap: {meal_gap} hours
 - Symptoms: {symptom}
 - Predicted risk: {risk}
@@ -132,7 +133,7 @@ IMPORTANT:
 # -------------------------------
 # ACTION PLAN FUNCTION
 # -------------------------------
-def generate_ai_action_plan(age, glucose, pulse, blink, meal_gap, insulin, activity, symptom, risk):
+def generate_ai_action_plan(age, glucose, pulse, blink, gaze, meal_gap, insulin, activity, symptom, risk):
     prompt = f"""
 You are a safe health assistant in a hypoglycemia risk screening app.
 Do not diagnose disease or claim certainty.
@@ -142,6 +143,7 @@ Inputs:
 - Last glucose reading: {glucose} mg/dL
 - Pulse: {pulse} bpm
 - Blink rate: {blink} blinks/min
+- Gaze instability: {gaze} (higher values indicate more jitter)
 - Meal gap: {meal_gap} hours
 - Insulin/Medication: {insulin}
 - Activity: {activity}
@@ -305,6 +307,11 @@ def chat():
     except (ValueError, TypeError):
         glucose_val = 90.0
 
+    try:
+        gaze_val = float(data.get('gaze', 1.0))
+    except (ValueError, TypeError):
+        gaze_val = 1.0
+
     sweating = 1 if sym in ['sweat', 'sweating'] else 0
     dizziness = 1 if sym in ['dizzy', 'dizziness', 'confusion', 'weakness', 'shaky'] else 0
 
@@ -377,6 +384,7 @@ def chat():
         glucose_val,
         bpm_val,
         blink_val,
+        gaze_val,
         meal_hrs,
         sym,
         risk
@@ -430,6 +438,7 @@ def chat():
         "ai_explanation": ai_text,
         "blink_rate": blink_val,
         "blink_status": blink_status,
+        "gaze": gaze_val,
         "age": age_val,
         "glucose": glucose_val
     })
@@ -478,6 +487,11 @@ def action_plan():
     except:
         glucose_val = 90.0
 
+    try:
+        gaze_val = float(data.get('gaze', 1.0))
+    except:
+        gaze_val = 1.0
+
     sweating = 1 if sym in ['sweat', 'sweating'] else 0
     dizziness = 1 if sym in ['dizzy', 'dizziness', 'confusion', 'weakness', 'shaky', 'mild'] else 0
 
@@ -508,6 +522,7 @@ def action_plan():
         glucose_val,
         bpm_val,
         blink_val,
+        gaze_val,
         meal_hrs,
         ins,
         activity,
@@ -517,6 +532,7 @@ def action_plan():
 
     return jsonify({
         "risk": risk,
+        "gaze": gaze_val,
         "ai_analysis": ai_html
     })
 

@@ -3004,6 +3004,7 @@
       const lastScan = state.scanHistory[0];
       const bpm = lastScan ? lastScan.vitals.bpm : (state.baseline ? state.baseline.bpm : 72);
       const blink = lastScan ? lastScan.vitals.blink : 18;
+      const gaze = lastScan ? lastScan.vitals.gaze : (state.currentGaze || 1.0);
 
       const resultDiv = document.getElementById('actionPlanResult');
       resultDiv.style.display = 'block';
@@ -3025,6 +3026,7 @@
             activity: activityCtx,
             bpmo: bpm,
             blink_rate: blink,
+            gaze: gaze,
             age: ageInput,
             glucose: glucoseInput
           })
@@ -3180,6 +3182,10 @@
         ? state.scanHistory[0].vitals.blink
         : state.realBlinks;
 
+      const gaze = state.scanHistory.length
+        ? state.scanHistory[0].vitals.gaze
+        : state.currentGaze || 1.0;
+
       const apiBase = window.location.origin === 'null'
         ? 'http://127.0.0.1:5000'
         : window.location.origin;
@@ -3195,6 +3201,7 @@
             sym: sym,
             bpmo: bpmo,
             blink_rate: blink_rate,
+            gaze: gaze,
             age: age,
             glucose: glucose
           })
